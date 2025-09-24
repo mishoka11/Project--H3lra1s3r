@@ -1,0 +1,19 @@
+# Visual Studio cache
+.vs/
+*.vsidx
+*.vscode/
+*.user
+*.suo
+
+# Build outputs
+bin/
+obj/
+
+# Node (for frontend later)
+node_modules/
+dist/
+.next/
+
+# OS junk
+.DS_Store
+Thumbs.db

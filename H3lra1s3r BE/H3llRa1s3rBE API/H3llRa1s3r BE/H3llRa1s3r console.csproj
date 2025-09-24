@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net7.0</TargetFramework>
+    <RootNamespace>H3llRa1s3r_BE</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Folder Include="Domain Layer\" />
+    <Folder Include="Infrastructure\" />
+    <Folder Include="APIs\" />
+    <Folder Include="Application\" />
+    <Folder Include="Background services\" />
+  </ItemGroup>
+
+</Project>
