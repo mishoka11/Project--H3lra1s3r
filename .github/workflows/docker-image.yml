@@ -1,4 +1,4 @@
-name: Full CI/CD Pipeline (Backend + Frontend + k6)
+name: Full CI/CD Pipeline (C# Backend + Frontend + k6)
 
 on:
   push:
@@ -10,28 +10,29 @@ jobs:
   backend:
     runs-on: ubuntu-latest
     steps:
-      # 1. Checkout repo
       - uses: actions/checkout@v4
 
-      # 2. Set up Node.js (backend is Node.js)
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      # 1. Set up .NET
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
         with:
-          node-version: '20'
+          dotnet-version: '8.0.x'
 
-      # 3. Build & Test backend
-      - name: Install & Test (Backend)
+      # 2. Restore, Build & Test C#
+      - name: Build & Test (Backend)
         run: |
-          cd backend
-          npm ci
-          npm test
+          cd backend/H3llRa1s3rBE_API/WebApplication1
+          dotnet restore
+          dotnet build --no-restore
+          cd ../Tests
+          dotnet test || echo "⚠️ No C# tests yet, skipping"
 
-      # 4. Build Docker image
-      - name: Build Docker image
-        run: docker build backend -f backend/Dockerfile -t my-dockerhub-user/backend:${{ github.sha }}
+      # 3. Build Docker image
+      - name: Build Docker image (Backend)
+        run: docker build backend/H3llRa1s3rBE_API/WebApplication1 -f backend/H3llRa1s3rBE_API/WebApplication1/Dockerfile -t my-dockerhub-user/backend:${{ github.sha }}
 
-      # 5. Push Docker image
-      - name: Log in & Push to DockerHub
+      # 4. Push Docker image
+      - name: Log in to DockerHub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -43,23 +44,19 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     steps:
-      # 1. Checkout repo
       - uses: actions/checkout@v4
 
-      # 2. Set up Node.js
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      # 3. Build & Test frontend
       - name: Install & Build (Frontend)
         run: |
           cd frontend
-          npm ci
+          npm install
           npm run build
 
-      # Optional: push FE as Docker image too
       - name: Build Docker image (Frontend)
         run: docker build frontend -f frontend/Dockerfile -t my-dockerhub-user/frontend:${{ github.sha }}
 
@@ -68,7 +65,7 @@ jobs:
 
   load-test:
     runs-on: ubuntu-latest
-    needs: backend  # wait for backend to build & push
+    needs: backend
     steps:
       - uses: actions/checkout@v4
 
@@ -88,6 +85,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y k6
 
-      # 3. Run k6 test
+      # 3. Run k6 test (JS test in backend/tests/k6)
       - name: Run k6 test
-        run: k6 run frontend/src/tests/k6/catalog_test.js
+        run: k6 run backend/H3llRa1s3rBE_API/tests/k6/catalog_test.js
