@@ -43,7 +43,7 @@ jobs:
       # 6. Run container for testing
       - name: Run container
         run: |
-          docker run -d -p 8080:8080 --name test-service my-dockerhub-user/my-image:${{ github.sha}}
+          docker run -d -p 8080:8080 --name test-service my-dockerhub-user/my-image:${{ github.sha }}
           sleep 20  # wait for service to start
 
       # 7. Install k6
