@@ -26,4 +26,4 @@ jobs:
       - name: Run k6 test
         run: |
           ls -R ./backend
-          k6 run backend/H3llRa1s3rBE_API/H3llRa1s3r.Api/tests/catalog_test.js
+          k6 run backend/H3llRa1s3rBE_API/WebApplication1/tests/catalog_test.js
