@@ -24,4 +24,5 @@ jobs:
 
       # 2. Run k6 test
       - name: Run k6 test
-        run: k6 run backend/H3llRa1s3rBE_API/tests/k6/catalog_test.js
+        run: k6 run ./backend/H3llRa1s3rBE_API/H3llRa1s3r.Api/tests/catalog_test.js
+
