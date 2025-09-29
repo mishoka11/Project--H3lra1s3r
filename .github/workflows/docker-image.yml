@@ -22,7 +22,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y k6
 
-      # 2. Run k6 test
+      # 2. Run k6 test (with ls for debugging)
       - name: Run k6 test
-        run: k6 run ./backend/H3llRa1s3rBE_API/H3llRa1s3r.Api/tests/catalog_test.js
-
+        run: |
+          ls -R ./backend
+          k6 run backend/H3llRa1s3rBE_API/H3llRa1s3r.Api/tests/catalog_test.js
