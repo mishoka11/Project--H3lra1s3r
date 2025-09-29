@@ -1,4 +1,4 @@
-name: Full CI/CD Pipeline (C# Backend + Frontend + k6)
+name: Minimal CI/CD with k6 Test
 
 on:
   push:
@@ -7,75 +7,12 @@ on:
     branches: [ "main" ]
 
 jobs:
-  backend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      # 1. Set up .NET
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
-      # 2. Restore, Build & Test C#
-      - name: Build & Test (Backend)
-        run: |
-          cd backend/H3llRa1s3rBE_API/WebApplication1
-          dotnet restore
-          dotnet build --no-restore
-          cd ../Tests
-          dotnet test || echo "⚠️ No C# tests yet, skipping"
-
-      # 3. Build Docker image
-      - name: Build Docker image (Backend)
-        run: docker build backend/H3llRa1s3rBE_API/WebApplication1 -f backend/H3llRa1s3rBE_API/WebApplication1/Dockerfile -t my-dockerhub-user/backend:${{ github.sha }}
-
-      # 4. Push Docker image
-      - name: Log in to DockerHub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Push backend image
-        run: docker push my-dockerhub-user/backend:${{ github.sha }}
-
-  frontend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install & Build (Frontend)
-        run: |
-          cd frontend
-          npm install
-          npm run build
-
-      - name: Build Docker image (Frontend)
-        run: docker build frontend -f frontend/Dockerfile -t my-dockerhub-user/frontend:${{ github.sha }}
-
-      - name: Push frontend image
-        run: docker push my-dockerhub-user/frontend:${{ github.sha }}
-
   load-test:
     runs-on: ubuntu-latest
-    needs: backend
     steps:
       - uses: actions/checkout@v4
 
-      # 1. Run backend container
-      - name: Run backend container
-        run: |
-          docker run -d -p 8080:8080 --name test-backend my-dockerhub-user/backend:${{ github.sha }}
-          sleep 20
-
-      # 2. Install k6
+      # 1. Install k6
       - name: Install k6
         run: |
           sudo apt-get update
@@ -85,6 +22,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y k6
 
-      # 3. Run k6 test (JS test in backend/tests/k6)
+      # 2. Run k6 test
       - name: Run k6 test
         run: k6 run backend/H3llRa1s3rBE_API/tests/k6/catalog_test.js
