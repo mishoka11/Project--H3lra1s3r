@@ -1,4 +1,4 @@
-name: CI/CD Pipeline with Load Test
+name: CI/CD Pipeline with Load Test (Node.js)
 
 on:
   push:
@@ -14,25 +14,17 @@ jobs:
       # 1. Checkout code
       - uses: actions/checkout@v4
 
-      # 2. Set up JDK 17 (if Spring Boot service)
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
+      # 2. Set up Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          node-version: '20'
 
-      # If you have Node.js services, uncomment below:
-      # - name: Set up Node.js
-      #   uses: actions/setup-node@v4
-      #   with:
-      #     node-version: '20'
-
-      # 3. Build & Run Tests
-      - name: Build & Test
+      # 3. Install dependencies & run tests
+      - name: Build & Test (Node.js)
         run: |
-          ./mvnw clean verify   # for Spring Boot (Maven)
-          # ./gradlew build     # if using Gradle
-          # npm ci && npm test  # if using Node.js
+          npm ci
+          npm test
 
       # 4. Build Docker image
       - name: Build Docker image
@@ -48,11 +40,11 @@ jobs:
       - name: Push Docker image
         run: docker push my-dockerhub-user/my-image:${{ github.sha }}
 
-      # 6. Start the service in Docker (so we can test it)
+      # 6. Run container for testing
       - name: Run container
         run: |
-          docker run -d -p 8080:8080 --name test-service my-dockerhub-user/my-image:${{ github.sha }}
-          sleep 20  # wait for service to boot
+          docker run -d -p 8080:8080 --name test-service my-dockerhub-user/my-image:${{ github.sha}}
+          sleep 20  # wait for service to start
 
       # 7. Install k6
       - name: Install k6
@@ -66,5 +58,4 @@ jobs:
 
       # 8. Run k6 load test
       - name: Run k6 test
-        run: |
-          k6 run tests/k6/catalog_test.js
+        run: k6 run tests/k6/catalog_test.js
