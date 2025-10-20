@@ -1,0 +1,99 @@
+﻿version: "3.9"
+
+services:
+  catalog-service:
+    container_name: catalog-service
+    build:
+      context: ./backend/H3llRa1s3rBE_API/CatalogService
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/healthz/live || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: on-failure
+    networks:
+      - h3llra1s3r-net
+
+  order-service:
+    container_name: order-service
+    build:
+      context: ./backend/H3llRa1s3rBE_API/OrderService
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/healthz/live || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: on-failure
+    networks:
+      - h3llra1s3r-net
+
+  design-service:
+    container_name: design-service
+    build:
+      context: ./backend/H3llRa1s3rBE_API/DesignService
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/healthz/live || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: on-failure
+    networks:
+      - h3llra1s3r-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - catalog-service
+      - order-service
+      - design-service
+    networks:
+      - h3llra1s3r-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - h3llra1s3r-net
+
+  k6:
+    image: grafana/k6:latest
+    container_name: k6
+    volumes:
+      - "C:/Users/MSI/Desktop/H3lra1s3r/Project--H3lra1s3r/backend/H3llRa1s3rBE_API/WebApplication1/LoadTests:/scripts"
+    depends_on:
+      - catalog-service
+      - order-service
+      - design-service
+    networks:
+      - h3llra1s3r-net
+    entrypoint: ["tail", "-f", "/dev/null"]
+
+    # Keeps the container idle so you can exec into it for tests
+
+networks:
+  h3llra1s3r-net:
+    driver: bridge

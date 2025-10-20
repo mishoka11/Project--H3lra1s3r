@@ -1,0 +1,8 @@
+﻿bin/
+obj/
+Dockerfile
+docker-compose*.yml
+*.md
+*.yaml
+*.yml
+.env

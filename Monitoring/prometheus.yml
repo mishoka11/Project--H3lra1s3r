@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: 'catalog-service'
+    static_configs:
+      - targets: ['catalog-service:8080']
+
+  - job_name: 'order-service'
+    static_configs:
+      - targets: ['order-service:8080']
+
+  - job_name: 'design-service'
+    static_configs:
+      - targets: ['design-service:8080']

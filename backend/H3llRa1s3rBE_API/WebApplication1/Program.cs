@@ -1,25 +1,43 @@
+using Prometheus;
+using Serilog;
+using Microsoft.OpenApi.Models;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-builder.Services.AddRazorPages();
+// ---- Logging ----
+builder.Host.UseSerilog((ctx, cfg) =>
+    cfg.ReadFrom.Configuration(ctx.Configuration).WriteTo.Console());
 
+// ---- Services ----
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "H3lRa1s3r API Gateway",
+        Version = "v1"
+    });
+});
+builder.Services.AddHealthChecks();
+builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
+    p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
+
+// ---- Build app ----
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (!app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    app.UseHsts();
+    
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
-app.UseStaticFiles();
+app.UseSerilogRequestLogging();
+app.UseCors();
+app.UseMetricServer();
+app.UseHttpMetrics();
 
-app.UseRouting();
-
-app.UseAuthorization();
-
-app.MapRazorPages();
+app.MapHealthChecks("/healthz/live");
+app.MapHealthChecks("/healthz/ready");
 
 app.Run();
