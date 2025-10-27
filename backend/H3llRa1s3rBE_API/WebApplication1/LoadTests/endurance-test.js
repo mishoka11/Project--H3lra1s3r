@@ -3,10 +3,10 @@ import { sleep } from 'k6';
 
 export const options = {
     vus: 25,
-    duration: '5m',
+    duration: '1m',
 };
 
 export default function () {
-    http.get('http://localhost:8082/api/v1/orders');
+    http.get('http://order-service:8080/healthz/live');
     sleep(0.5);
 }

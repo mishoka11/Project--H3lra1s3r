@@ -1,20 +1,32 @@
-﻿using Prometheus;
+﻿using DesignService.Infra;
+using Microsoft.EntityFrameworkCore;
+using Prometheus;
 using Serilog;
 using static H3lRa1s3r.Api.DesignService.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// ---- Logging ----
 builder.Host.UseSerilog((ctx, cfg) =>
     cfg.ReadFrom.Configuration(ctx.Configuration).WriteTo.Console());
 
+// ---- Services ----
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.AddHealthChecks();
+
+// PostgreSQL + EF Core
+var conn = builder.Configuration.GetConnectionString("Designs")
+           ?? "Host=postgres;Database=h3db;Username=h3user;Password=h3pass";
+
+builder.Services.AddDbContext<DesignDbContext>(o => o.UseNpgsql(conn));
+builder.Services.AddHealthChecks().AddNpgSql(conn);
+
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
     p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
 
 var app = builder.Build();
 
+// ---- Middleware ----
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -26,34 +38,63 @@ app.UseCors();
 app.UseMetricServer();
 app.UseHttpMetrics();
 
-// ✅ Seed demo design
-if (!DesignsDb.Designs.ContainsKey("123"))
-{
-    var demoDesign = new Design(
-        Id: "123",
-        UserId: "demo-user",
-        Name: "Demo Design",
-        JsonPayload: "{\"elements\": [\"circle\", \"square\"]}",
-        CreatedAt: DateTimeOffset.UtcNow
-    );
-
-    DesignsDb.Designs["123"] = demoDesign;
-}
-
 // ---- Endpoints ----
-app.MapPost("/api/v1/designs", (Design d) =>
+
+// ✅ Create Design
+app.MapPost("/api/v1/designs", async (Design d, DesignDbContext db) =>
 {
     var id = string.IsNullOrWhiteSpace(d.Id) ? Guid.NewGuid().ToString("n") : d.Id;
-    DesignsDb.Designs[id] = d with { Id = id, CreatedAt = DateTimeOffset.UtcNow };
-    return Results.Created($"/api/v1/designs/{id}", DesignsDb.Designs[id]);
+    var newDesign = new Design
+    {
+        Id = id,
+        UserId = d.UserId,
+        Name = d.Name,
+        JsonPayload = d.JsonPayload,
+        CreatedAt = DateTimeOffset.UtcNow
+    };
+
+    db.Designs.Add(newDesign);
+    await db.SaveChangesAsync();
+
+    return Results.Created($"/api/v1/designs/{id}", newDesign);
 }).WithOpenApi();
 
-app.MapGet("/api/v1/designs/{id}", (string id) =>
-    DesignsDb.Designs.TryGetValue(id, out var d)
-        ? Results.Ok(d)
-        : Results.NotFound()).WithOpenApi();
+// ✅ Get Design by Id
+app.MapGet("/api/v1/designs/{id}", async (string id, DesignDbContext db) =>
+{
+    var design = await db.Designs.FindAsync(id);
+    return design is not null ? Results.Ok(design) : Results.NotFound();
+}).WithOpenApi();
 
+// ✅ Get All Designs
+app.MapGet("/api/v1/designs", async (DesignDbContext db) =>
+    Results.Ok(await db.Designs.ToListAsync()))
+.WithOpenApi();
+
+// ✅ Health
 app.MapHealthChecks("/healthz/live");
 app.MapHealthChecks("/healthz/ready");
+
+// ✅ Seed demo data
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<DesignDbContext>();
+    db.Database.EnsureCreated();
+
+    if (!db.Designs.Any())
+    {
+        var demoDesign = new Design
+        {
+            UserId = "demo-user",
+            Name = "Demo Design",
+            JsonPayload = "{\"elements\": [\"circle\", \"square\"]}",
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        db.Designs.Add(demoDesign);
+        db.SaveChanges();
+        Console.WriteLine("✅ Seeded demo Design");
+    }
+}
 
 app.Run();

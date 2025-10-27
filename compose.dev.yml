@@ -1,6 +1,27 @@
 ﻿version: "3.9"
 
 services:
+  # 🟦 PostgreSQL Database
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    environment:
+      POSTGRES_USER: h3user
+      POSTGRES_PASSWORD: h3pass
+      POSTGRES_DB: h3db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U h3user -d h3db"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - h3llra1s3r-net
+
+  # 🟢 Catalog Service
   catalog-service:
     container_name: catalog-service
     build:
@@ -16,9 +37,13 @@ services:
       timeout: 5s
       retries: 3
     restart: on-failure
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - h3llra1s3r-net
 
+  # 🟣 Order Service
   order-service:
     container_name: order-service
     build:
@@ -28,15 +53,20 @@ services:
       - "8082:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__Orders=Host=postgres;Database=h3db;Username=h3user;Password=h3pass
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: on-failure
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/healthz/live || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
-    restart: on-failure
     networks:
       - h3llra1s3r-net
 
+  # 🟡 Design Service
   design-service:
     container_name: design-service
     build:
@@ -46,15 +76,20 @@ services:
       - "8083:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__Designs=Host=postgres;Database=h3db;Username=h3user;Password=h3pass
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: on-failure
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/healthz/live || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
-    restart: on-failure
     networks:
       - h3llra1s3r-net
 
+  # 📊 Prometheus
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
@@ -69,6 +104,7 @@ services:
     networks:
       - h3llra1s3r-net
 
+  # 📈 Grafana
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
@@ -79,20 +115,34 @@ services:
     networks:
       - h3llra1s3r-net
 
+  # 🧪 K6 Load Test Runner (idle until executed)
   k6:
     image: grafana/k6:latest
     container_name: k6
     volumes:
-      - "C:/Users/MSI/Desktop/H3lra1s3r/Project--H3lra1s3r/backend/H3llRa1s3rBE_API/WebApplication1/LoadTests:/scripts"
+      - ./backend/H3llRa1s3rBE_API/H3lRa1s3r.Api/LoadTests:/scripts
     depends_on:
       - catalog-service
       - order-service
       - design-service
+    entrypoint: ["tail", "-f", "/dev/null"]
     networks:
       - h3llra1s3r-net
-    entrypoint: ["tail", "-f", "/dev/null"]
 
-    # Keeps the container idle so you can exec into it for tests
+  # 🧮 Adminer (DB Web UI)
+  adminer:
+    image: adminer:latest
+    container_name: adminer
+    ports:
+      - "8088:8080"
+    depends_on:
+      - postgres
+    networks:
+      - h3llra1s3r-net
+
+# 🔒 Shared volumes and networks
+volumes:
+  pgdata:
 
 networks:
   h3llra1s3r-net:
