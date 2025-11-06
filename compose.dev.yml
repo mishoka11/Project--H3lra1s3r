@@ -95,6 +95,7 @@ services:
     container_name: prometheus
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
     ports:
       - "9090:9090"
     depends_on:
@@ -108,6 +109,12 @@ services:
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=D0nmaglass
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards
     ports:
       - "3000:3000"
     depends_on:
@@ -115,21 +122,36 @@ services:
     networks:
       - h3llra1s3r-net
 
-  # 🧪 K6 Load Test Runner (idle until executed)
+  # 📈 StatsD → Prometheus bridge
+  statsd-exporter:
+    image: prom/statsd-exporter:latest
+    container_name: statsd-exporter
+    ports:
+      - "9102:9102"       # Prometheus scrape endpoint
+      - "9125:9125/udp"   # UDP for k6 metrics
+    networks:
+      - h3llra1s3r-net
+
+  # 🧪 K6 Load Test Runner
   k6:
-    image: grafana/k6:latest
+    image: grafana/k6:0.46.0
     container_name: k6
-    volumes:
-      - ./backend/H3llRa1s3rBE_API/H3lRa1s3r.Api/LoadTests:/scripts
     depends_on:
       - catalog-service
       - order-service
       - design-service
-    entrypoint: ["tail", "-f", "/dev/null"]
-    networks:
+      - statsd-exporter
+    volumes:
+      - ./backend/H3llRa1s3rBE_API/WebApplication1/LoadTests:/scripts
+    environment:
+      - K6_STATSD_ADDR=statsd-exporter:9125
+      - K6_STATSD_ENABLE_TAGS=true
+      - K6_STATSD_PUSH_INTERVAL=1s
+    command: ["run", "/scripts/endurance-test.js", "--out", "statsd"]
+    networks:                # ✅ no extra space here
       - h3llra1s3r-net
 
-  # 🧮 Adminer (DB Web UI)
+  # 🧮 Adminer
   adminer:
     image: adminer:latest
     container_name: adminer
@@ -143,6 +165,8 @@ services:
 # 🔒 Shared volumes and networks
 volumes:
   pgdata:
+  prometheus_data:
+  grafana_data:
 
 networks:
   h3llra1s3r-net:

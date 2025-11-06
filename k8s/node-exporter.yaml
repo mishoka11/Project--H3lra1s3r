@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-exporter
+  namespace: h3llra1s3r
+  labels:
+    app: node-exporter
+spec:
+  selector:
+    matchLabels:
+      app: node-exporter
+  template:
+    metadata:
+      labels:
+        app: node-exporter
+    spec:
+      hostPID: true
+      hostNetwork: true
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
+      containers:
+        - name: node-exporter
+          image: prom/node-exporter:v1.8.1
+          args:
+            - --path.rootfs=/host
+          ports:
+            - name: metrics
+              containerPort: 9100
+          resources:
+            limits:
+              memory: 128Mi
+              cpu: 100m
+          volumeMounts:
+            - name: root
+              mountPath: /host
+              readOnly: true
+      volumes:
+        - name: root
+          hostPath:
+            path: /
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: node-exporter
+  namespace: h3llra1s3r
+  labels:
+    app: node-exporter
+spec:
+  selector:
+    app: node-exporter
+  ports:
+    - name: metrics
+      port: 9100
+      targetPort: metrics
+  type: ClusterIP

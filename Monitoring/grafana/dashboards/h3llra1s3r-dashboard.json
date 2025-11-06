@@ -1,0 +1,30 @@
+{
+  "id": null,
+  "title": "H3llRa1s3r Service Metrics",
+  "timezone": "browser",
+  "panels": [
+    {
+      "type": "graph",
+      "title": "Request Rate per Service",
+      "targets": [
+        { "expr": "rate(http_requests_received_total[1m])", "legendFormat": "{{job}}" }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Container CPU Usage",
+      "targets": [
+        { "expr": "rate(container_cpu_usage_seconds_total[1m])", "legendFormat": "{{container}}" }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Container Memory Usage",
+      "targets": [
+        { "expr": "container_memory_usage_bytes / 1024 / 1024", "legendFormat": "{{container}}" }
+      ]
+    }
+  ],
+  "schemaVersion": 36,
+  "version": 1
+}
