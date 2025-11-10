@@ -1,0 +1,161 @@
+name: H3llra1s3r Microservices CI/CD
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+env:
+  REGISTRY: docker.io/mmihov11
+  NAMESPACE: h3llra1s3r
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  # ============================================================
+  # 🧱 CATALOG SERVICE
+  # ============================================================
+  catalog-service:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker registry
+        run: echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Build & push Catalog Service
+        run: |
+          docker build -t $REGISTRY/catalog-service:${IMAGE_TAG} ./backend/H3llRa1s3rBE_API/CatalogService
+          docker tag $REGISTRY/catalog-service:${IMAGE_TAG} $REGISTRY/catalog-service:latest
+          docker push $REGISTRY/catalog-service:${IMAGE_TAG}
+          docker push $REGISTRY/catalog-service:latest
+
+      - name: Configure kubectl
+        run: |
+          echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 --decode > $HOME/.kube/config
+
+      - name: Deploy Catalog Service
+        continue-on-error: true
+        run: |
+          echo "🚀 Deploying Catalog Service..."
+          kubectl set image deployment/catalog-service catalog-service=$REGISTRY/catalog-service:${IMAGE_TAG} -n $NAMESPACE || \
+          kubectl apply -f ./backend/H3llRa1s3rBE_API/k8s/catalog-deployment.yaml -n $NAMESPACE
+
+      - name: Verify rollout and rollback on failure
+        run: |
+          echo "🧩 Checking rollout status for Catalog Service..."
+          if ! kubectl rollout status deployment/catalog-service -n $NAMESPACE --timeout=90s; then
+            echo "⚠️ Deployment failed, rolling back to previous version..."
+            kubectl rollout undo deployment/catalog-service -n $NAMESPACE
+            exit 1
+          fi
+
+  # ============================================================
+  # 🎨 DESIGN SERVICE
+  # ============================================================
+  design-service:
+    runs-on: ubuntu-latest
+    needs: [catalog-service]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker registry
+        run: echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Build & push Design Service
+        run: |
+          docker build -t $REGISTRY/design-service:${IMAGE_TAG} ./backend/H3llRa1s3rBE_API/DesignService
+          docker tag $REGISTRY/design-service:${IMAGE_TAG} $REGISTRY/design-service:latest
+          docker push $REGISTRY/design-service:${IMAGE_TAG}
+          docker push $REGISTRY/design-service:latest
+
+      - name: Configure kubectl
+        run: |
+          echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 --decode > $HOME/.kube/config
+
+      - name: Deploy Design Service
+        continue-on-error: true
+        run: |
+          echo "🚀 Deploying Design Service..."
+          kubectl set image deployment/design-service design-service=$REGISTRY/design-service:${IMAGE_TAG} -n $NAMESPACE || \
+          kubectl apply -f ./backend/H3llRa1s3rBE_API/k8s/design-deployment.yaml -n $NAMESPACE
+
+      - name: Verify rollout and rollback on failure
+        run: |
+          echo "🧩 Checking rollout status for Design Service..."
+          if ! kubectl rollout status deployment/design-service -n $NAMESPACE --timeout=90s; then
+            echo "⚠️ Deployment failed, rolling back to previous version..."
+            kubectl rollout undo deployment/design-service -n $NAMESPACE
+            exit 1
+          fi
+
+  # ============================================================
+  # 📦 ORDER SERVICE
+  # ============================================================
+  order-service:
+    runs-on: ubuntu-latest
+    needs: [design-service]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker registry
+        run: echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Build & push Order Service
+        run: |
+          docker build -t $REGISTRY/order-service:${IMAGE_TAG} ./backend/H3llRa1s3rBE_API/OrderService
+          docker tag $REGISTRY/order-service:${IMAGE_TAG} $REGISTRY/order-service:latest
+          docker push $REGISTRY/order-service:${IMAGE_TAG}
+          docker push $REGISTRY/order-service:latest
+
+      - name: Configure kubectl
+        run: |
+          echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 --decode > $HOME/.kube/config
+
+      - name: Deploy Order Service
+        continue-on-error: true
+        run: |
+          echo "🚀 Deploying Order Service..."
+          kubectl set image deployment/order-service order-service=$REGISTRY/order-service:${IMAGE_TAG} -n $NAMESPACE || \
+          kubectl apply -f ./backend/H3llRa1s3rBE_API/k8s/order-deployment.yaml -n $NAMESPACE
+
+      - name: Verify rollout and rollback on failure
+        run: |
+          echo "🧩 Checking rollout status for Order Service..."
+          if ! kubectl rollout status deployment/order-service -n $NAMESPACE --timeout=90s; then
+            echo "⚠️ Deployment failed, rolling back to previous version..."
+            kubectl rollout undo deployment/order-service -n $NAMESPACE
+            exit 1
+          fi
+
+  # ============================================================
+  # 🧪 LOAD TESTS (optional)
+  # ============================================================
+  load-tests:
+    runs-on: ubuntu-latest
+    needs: [catalog-service, design-service, order-service]
+    if: success()
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install k6
+        run: |
+          sudo apt-get update && sudo apt-get install -y gnupg software-properties-common
+          curl -s https://dl.k6.io/key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/k6-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update && sudo apt-get install -y k6
+
+      - name: Run Health Check Test
+        run: |
+          echo "🏃 Running k6 health tests..."
+          k6 run backend/H3llRa1s3rBE_API/WebApplication1/LoadTests/health_test.js || true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-test-results
+          path: ./results
