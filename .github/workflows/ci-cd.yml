@@ -24,6 +24,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-central-1
+
       - name: Log in to Docker registry
         run: echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
@@ -43,10 +50,10 @@ jobs:
       - name: Deploy Catalog Service
         run: |
           kubectl set image deployment/catalog-service catalog-service=$REGISTRY/catalog-service:${IMAGE_TAG} -n $NAMESPACE || \
-          kubectl apply -f ./backend/H3llRa1s3rBE_API/k8s/catalog-deployment.yaml -n $NAMESPACE
+          kubectl apply -f ./k8s/catalog-deployment.yaml -n $NAMESPACE
           kubectl rollout status deployment/catalog-service -n $NAMESPACE --timeout=60s || true
 
-      - name: Verify rollout and rollback on failure
+      - name: Rollback if failed
         if: failure()
         run: |
           echo "⚠️ Catalog Service failed — rolling back..."
@@ -64,6 +71,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-central-1
 
       - name: Log in to Docker registry
         run: echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
@@ -84,10 +98,10 @@ jobs:
       - name: Deploy Design Service
         run: |
           kubectl set image deployment/design-service design-service=$REGISTRY/design-service:${IMAGE_TAG} -n $NAMESPACE || \
-          kubectl apply -f ./backend/H3llRa1s3rBE_API/k8s/design-deployment.yaml -n $NAMESPACE
+          kubectl apply -f ./k8s/design-deployment.yaml -n $NAMESPACE
           kubectl rollout status deployment/design-service -n $NAMESPACE --timeout=60s || true
 
-      - name: Verify rollout and rollback on failure
+      - name: Rollback if failed
         if: failure()
         run: |
           echo "⚠️ Design Service failed — rolling back..."
@@ -105,6 +119,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-central-1
 
       - name: Log in to Docker registry
         run: echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
@@ -125,10 +146,10 @@ jobs:
       - name: Deploy Order Service
         run: |
           kubectl set image deployment/order-service order-service=$REGISTRY/order-service:${IMAGE_TAG} -n $NAMESPACE || \
-          kubectl apply -f ./backend/H3llRa1s3rBE_API/k8s/order-deployment.yaml -n $NAMESPACE
+          kubectl apply -f ./k8s/order-deployment.yaml -n $NAMESPACE
           kubectl rollout status deployment/order-service -n $NAMESPACE --timeout=60s || true
 
-      - name: Verify rollout and rollback on failure
+      - name: Rollback if failed
         if: failure()
         run: |
           echo "⚠️ Order Service failed — rolling back..."
