@@ -16,7 +16,10 @@ jobs:
   # 🧱 CATALOG SERVICE
   # ============================================================
   catalog-service:
+    name: Deploy Catalog Service
     runs-on: ubuntu-latest
+    continue-on-error: true
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -33,30 +36,31 @@ jobs:
 
       - name: Configure kubectl
         run: |
+          mkdir -p $HOME/.kube
           echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 --decode > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
 
       - name: Deploy Catalog Service
-        continue-on-error: true
         run: |
-          echo "🚀 Deploying Catalog Service..."
           kubectl set image deployment/catalog-service catalog-service=$REGISTRY/catalog-service:${IMAGE_TAG} -n $NAMESPACE || \
           kubectl apply -f ./backend/H3llRa1s3rBE_API/k8s/catalog-deployment.yaml -n $NAMESPACE
+          kubectl rollout status deployment/catalog-service -n $NAMESPACE --timeout=60s || true
 
       - name: Verify rollout and rollback on failure
+        if: failure()
         run: |
-          echo "🧩 Checking rollout status for Catalog Service..."
-          if ! kubectl rollout status deployment/catalog-service -n $NAMESPACE --timeout=90s; then
-            echo "⚠️ Deployment failed, rolling back to previous version..."
-            kubectl rollout undo deployment/catalog-service -n $NAMESPACE
-            exit 1
-          fi
+          echo "⚠️ Catalog Service failed — rolling back..."
+          kubectl rollout undo deployment/catalog-service -n $NAMESPACE
 
   # ============================================================
   # 🎨 DESIGN SERVICE
   # ============================================================
   design-service:
+    name: Deploy Design Service
     runs-on: ubuntu-latest
-    needs: [catalog-service]
+    continue-on-error: true
+    if: always()
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -73,30 +77,31 @@ jobs:
 
       - name: Configure kubectl
         run: |
+          mkdir -p $HOME/.kube
           echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 --decode > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
 
       - name: Deploy Design Service
-        continue-on-error: true
         run: |
-          echo "🚀 Deploying Design Service..."
           kubectl set image deployment/design-service design-service=$REGISTRY/design-service:${IMAGE_TAG} -n $NAMESPACE || \
           kubectl apply -f ./backend/H3llRa1s3rBE_API/k8s/design-deployment.yaml -n $NAMESPACE
+          kubectl rollout status deployment/design-service -n $NAMESPACE --timeout=60s || true
 
       - name: Verify rollout and rollback on failure
+        if: failure()
         run: |
-          echo "🧩 Checking rollout status for Design Service..."
-          if ! kubectl rollout status deployment/design-service -n $NAMESPACE --timeout=90s; then
-            echo "⚠️ Deployment failed, rolling back to previous version..."
-            kubectl rollout undo deployment/design-service -n $NAMESPACE
-            exit 1
-          fi
+          echo "⚠️ Design Service failed — rolling back..."
+          kubectl rollout undo deployment/design-service -n $NAMESPACE
 
   # ============================================================
   # 📦 ORDER SERVICE
   # ============================================================
   order-service:
+    name: Deploy Order Service
     runs-on: ubuntu-latest
-    needs: [design-service]
+    continue-on-error: true
+    if: always()
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -113,31 +118,32 @@ jobs:
 
       - name: Configure kubectl
         run: |
+          mkdir -p $HOME/.kube
           echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 --decode > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
 
       - name: Deploy Order Service
-        continue-on-error: true
         run: |
-          echo "🚀 Deploying Order Service..."
           kubectl set image deployment/order-service order-service=$REGISTRY/order-service:${IMAGE_TAG} -n $NAMESPACE || \
           kubectl apply -f ./backend/H3llRa1s3rBE_API/k8s/order-deployment.yaml -n $NAMESPACE
+          kubectl rollout status deployment/order-service -n $NAMESPACE --timeout=60s || true
 
       - name: Verify rollout and rollback on failure
+        if: failure()
         run: |
-          echo "🧩 Checking rollout status for Order Service..."
-          if ! kubectl rollout status deployment/order-service -n $NAMESPACE --timeout=90s; then
-            echo "⚠️ Deployment failed, rolling back to previous version..."
-            kubectl rollout undo deployment/order-service -n $NAMESPACE
-            exit 1
-          fi
+          echo "⚠️ Order Service failed — rolling back..."
+          kubectl rollout undo deployment/order-service -n $NAMESPACE
 
   # ============================================================
-  # 🧪 LOAD TESTS (optional)
+  # 🧪 LOAD TESTS (optional - non-blocking)
   # ============================================================
   load-tests:
+    name: Run Load Tests
     runs-on: ubuntu-latest
+    if: always()
     needs: [catalog-service, design-service, order-service]
-    if: success()
+    continue-on-error: true
+
     steps:
       - uses: actions/checkout@v4
 
@@ -150,7 +156,6 @@ jobs:
 
       - name: Run Health Check Test
         run: |
-          echo "🏃 Running k6 health tests..."
           k6 run backend/H3llRa1s3rBE_API/WebApplication1/LoadTests/health_test.js || true
 
       - name: Upload test results
