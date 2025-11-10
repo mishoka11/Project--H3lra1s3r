@@ -2,9 +2,9 @@ name: H3llra1s3r Microservices CI/CD
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "feature/*"]
   pull_request:
-    branches: ["main"]
+    branches: ["main", "feature/*"]
 
 env:
   REGISTRY: docker.io/mmihov11
