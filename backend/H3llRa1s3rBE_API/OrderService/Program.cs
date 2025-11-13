@@ -75,6 +75,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseSerilogRequestLogging();
 app.UseCors();
+
+// 👇 Prometheus middleware
 app.UseMetricServer();
 app.UseHttpMetrics();
 
@@ -86,3 +88,4 @@ app.MapGet("/healthz/live", () => Results.Ok("Alive"));
 app.MapGet("/healthz/ready", () => Results.Ok("Ready"));
 
 app.Run();
+

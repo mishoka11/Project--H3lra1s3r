@@ -35,12 +35,12 @@ if (app.Environment.IsDevelopment())
 
 app.UseSerilogRequestLogging();
 app.UseCors();
+
+// 👇 Prometheus middleware
 app.UseMetricServer();
 app.UseHttpMetrics();
 
 // ---- Endpoints ----
-
-// ✅ Create Design
 app.MapPost("/api/v1/designs", async (Design d, DesignDbContext db) =>
 {
     var id = string.IsNullOrWhiteSpace(d.Id) ? Guid.NewGuid().ToString("n") : d.Id;
@@ -59,42 +59,16 @@ app.MapPost("/api/v1/designs", async (Design d, DesignDbContext db) =>
     return Results.Created($"/api/v1/designs/{id}", newDesign);
 }).WithOpenApi();
 
-// ✅ Get Design by Id
 app.MapGet("/api/v1/designs/{id}", async (string id, DesignDbContext db) =>
 {
     var design = await db.Designs.FindAsync(id);
     return design is not null ? Results.Ok(design) : Results.NotFound();
 }).WithOpenApi();
 
-// ✅ Get All Designs
 app.MapGet("/api/v1/designs", async (DesignDbContext db) =>
     Results.Ok(await db.Designs.ToListAsync()))
 .WithOpenApi();
 
-// ✅ Health
 app.MapHealthChecks("/healthz/live");
 app.MapHealthChecks("/healthz/ready");
-
-// ✅ Seed demo data
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<DesignDbContext>();
-    db.Database.EnsureCreated();
-
-    if (!db.Designs.Any())
-    {
-        var demoDesign = new Design
-        {
-            UserId = "demo-user",
-            Name = "Demo Design",
-            JsonPayload = "{\"elements\": [\"circle\", \"square\"]}",
-            CreatedAt = DateTimeOffset.UtcNow
-        };
-
-        db.Designs.Add(demoDesign);
-        db.SaveChanges();
-        Console.WriteLine("✅ Seeded demo Design");
-    }
-}
-
 app.Run();
