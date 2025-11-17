@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: h3llra1s3r
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 10s
+      evaluation_interval: 10s
+
+    scrape_configs:
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+
+      - job_name: 'catalog-service'
+        metrics_path: /metrics
+        honor_labels: true
+        static_configs:
+          - targets: ['catalog-service.h3llra1s3r.svc.cluster.local:8080']
+
+      - job_name: 'design-service'
+        metrics_path: /metrics
+        honor_labels: true
+        static_configs:
+          - targets: ['design-service.h3llra1s3r.svc.cluster.local:8080']
+
+      - job_name: 'order-service'
+        metrics_path: /metrics
+        honor_labels: true
+        static_configs:
+          - targets: ['order-service.h3llra1s3r.svc.cluster.local:8080']
+      - job_name: 'node-exporter'
+        static_configs:
+          - targets: ['node-exporter.h3llra1s3r.svc.cluster.local:9100']    
+      - job_name: 'kube-state-metrics'
+        metrics_path: /metrics
+        honor_labels: true
+        static_configs:
+          - targets: ['kube-state-metrics.kube-system.svc.cluster.local:8080']
