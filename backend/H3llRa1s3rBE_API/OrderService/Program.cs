@@ -1,20 +1,72 @@
-﻿using Prometheus;
+﻿using Microsoft.EntityFrameworkCore;
+using OrderService.Infra;
+using Prometheus;
 using Serilog;
+using Polly;
 using static H3lRa1s3r.Api.OrderService.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// ---- Logging ----
 builder.Host.UseSerilog((ctx, cfg) =>
-    cfg.ReadFrom.Configuration(ctx.Configuration).WriteTo.Console());
+    cfg.ReadFrom.Configuration(ctx.Configuration)
+       .WriteTo.Console());
 
+// ---- Services ----
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.AddHealthChecks();
+
+// ---- PostgreSQL + EF Core ----
+var conn = builder.Configuration.GetConnectionString("Orders")
+           ?? "Host=postgres.h3llra1s3r.svc.cluster.local;Port=5432;Database=h3db;Username=h3user;Password=h3pass;Pooling=true;";
+
+builder.Services.AddDbContext<OrderDbContext>(o => o.UseNpgsql(conn));
+
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
     p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
 
+builder.Services.AddHealthChecks();
+
 var app = builder.Build();
 
+// ---- Ensure DB schema + run migrations ----
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<OrderDbContext>();
+
+    var retryPolicy = Policy
+        .Handle<Exception>()
+        .WaitAndRetry(5, attempt => TimeSpan.FromSeconds(3),
+            (ex, time) => Console.WriteLine($"⏳ Waiting for DB... ({ex.Message})"));
+
+    retryPolicy.Execute(() =>
+    {
+        Console.WriteLine("🔍 Applying pending EF Core migrations...");
+        db.Database.Migrate();
+        Console.WriteLine("✅ Database schema up to date!");
+    });
+
+    // ✅ Seed demo data if empty
+    if (!db.Orders.Any())
+    {
+        Console.WriteLine("🌱 Seeding demo order...");
+        db.Orders.Add(new Order
+        {
+            UserId = "demo-user",
+            CreatedAt = DateTimeOffset.UtcNow,
+            Items = new List<OrderItem>
+            {
+                new() { ProductId = "demo-prod-001", Quantity = 2, UnitPrice = 19.99m },
+                new() { ProductId = "demo-prod-002", Quantity = 1, UnitPrice = 39.99m }
+            },
+            Status = "Created"
+        });
+        db.SaveChanges();
+        Console.WriteLine("✅ Seeded demo order");
+    }
+}
+
+// ---- Middleware ----
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -23,56 +75,17 @@ if (app.Environment.IsDevelopment())
 
 app.UseSerilogRequestLogging();
 app.UseCors();
+
+// 👇 Prometheus middleware
 app.UseMetricServer();
 app.UseHttpMetrics();
 
-// ✅ Seed demo order
-if (!OrdersDb.Orders.ContainsKey("1"))
-{
-    var demoOrder = new Order(
-        Id: "1",
-        UserId: "demo-user",
-        CreatedAt: DateTimeOffset.UtcNow,
-        Items: new[]
-        {
-            new OrderItem(ProductId: "demo-prod-001", Quantity: 2, UnitPrice: 19.99m),
-            new OrderItem(ProductId: "demo-prod-002", Quantity: 1, UnitPrice: 39.99m)
-        },
-        Status: "Created"
-    );
-
-    OrdersDb.Orders["1"] = demoOrder;
-}
-
 // ---- Endpoints ----
-app.MapPost("/api/v1/orders", (Order order, HttpRequest req) =>
-{
-    var key = req.Headers.TryGetValue("Idempotency-Key", out var k)
-        ? k.ToString()
-        : order.Id;
+app.MapGet("/api/v1/orders", async (OrderDbContext db) =>
+    Results.Ok(await db.Orders.ToListAsync()));
 
-    if (OrdersDb.Orders.ContainsKey(key))
-        return Results.Ok(OrdersDb.Orders[key]);
-
-    OrdersDb.Orders[key] = order with
-    {
-        CreatedAt = DateTimeOffset.UtcNow,
-        Status = "Created"
-    };
-
-    return Results.Created($"/api/v1/orders/{key}", OrdersDb.Orders[key]);
-})
-.WithName("CreateOrder")
-.WithOpenApi();
-
-app.MapGet("/api/v1/orders/{id}", (string id) =>
-    OrdersDb.Orders.TryGetValue(id, out var o)
-        ? Results.Ok(o)
-        : Results.NotFound())
-.WithName("GetOrder")
-.WithOpenApi();
-
-app.MapHealthChecks("/healthz/live");
-app.MapHealthChecks("/healthz/ready");
+app.MapGet("/healthz/live", () => Results.Ok("Alive"));
+app.MapGet("/healthz/ready", () => Results.Ok("Ready"));
 
 app.Run();
+
