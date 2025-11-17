@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: h3llra1s3r-platform
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/mishoka11/Project--H3lra1s3r'
+    targetRevision: main        # change to 'master' if your default branch is master
+    path: k8s                   # folder with your *.yaml files
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: h3llra1s3r       # matches your namespace.yaml
+  syncPolicy:
+    automated:
+      prune: true               # delete removed resources
+      selfHeal: true            # fix drift automatically
+    syncOptions:
+      - CreateNamespace=true    # create namespace if missing
