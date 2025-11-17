@@ -2,9 +2,26 @@
 {
     public class Models
     {
-        public record OrderItem(string ProductId, int Quantity, decimal UnitPrice);
-        public record Order(string Id, string UserId, DateTimeOffset CreatedAt, OrderItem[] Items, string Status);
-        public static class OrdersDb { public static readonly Dictionary<string, Order> Orders = new(); }
+        public class OrderItem
+        {
+            public string ProductId { get; set; } = default!;
+            public int Quantity { get; set; }
+            public decimal UnitPrice { get; set; }
+        }
 
+        public class Order
+        {
+            public string Id { get; set; } = Guid.NewGuid().ToString("n");
+            public string UserId { get; set; } = default!;
+            public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+            public ICollection<OrderItem> Items { get; set; } = new List<OrderItem>();
+            public string Status { get; set; } = "Created";
+        }
+
+        // Keeping the old dictionary for compatibility (not used by EF)
+        public static class OrdersDb
+        {
+            public static readonly Dictionary<string, Order> Orders = new();
+        }
     }
 }

@@ -49,8 +49,10 @@ app.UseSerilogRequestLogging();
 app.UseCors();
 app.UseRateLimiter();
 app.UseResponseCaching();
+
+// 👇 Prometheus middleware here
 app.UseMetricServer();
-app.UseHttpMetrics();
+app.UseHttpMetrics();  // <-- this collects http_requests_total and related metrics
 
 // ---- Seed data ----
 Seed.AddDemoProducts();
