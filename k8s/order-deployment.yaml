@@ -22,7 +22,10 @@ spec:
             - name: ASPNETCORE_ENVIRONMENT
               value: "Production"
             - name: ConnectionStrings__Orders
-              value: "Host=postgres.h3llra1s3r.svc.cluster.local;Port=5432;Database=h3db;Username=h3user;Password=h3pass;Pooling=true;"
+              valueFrom:
+                secretKeyRef:
+                  name: h3llra1s3r-secrets
+                  key: ORDER_CONNECTION
           livenessProbe:
             httpGet:
               path: /healthz/live
@@ -48,4 +51,3 @@ spec:
   ports:
     - port: 8080
       targetPort: 8080
-

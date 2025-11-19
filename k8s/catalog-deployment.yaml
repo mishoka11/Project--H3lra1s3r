@@ -22,7 +22,10 @@ spec:
             - name: ASPNETCORE_ENVIRONMENT
               value: "Production"
             - name: ConnectionStrings__Catalog
-              value: "Host=postgres.h3llra1s3r.svc.cluster.local;Port=5432;Database=h3db;Username=h3user;Password=h3pass;Pooling=true;"
+              valueFrom:
+                secretKeyRef:
+                  name: h3llra1s3r-secrets
+                  key: CATALOG_CONNECTION
           livenessProbe:
             httpGet:
               path: /healthz/live
@@ -35,7 +38,6 @@ spec:
               port: 8080
             initialDelaySeconds: 10
             periodSeconds: 10
-
 ---
 apiVersion: v1
 kind: Service
