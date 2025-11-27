@@ -15,27 +15,26 @@ spec:
     spec:
       containers:
         - name: prometheus
-          image: prom/prometheus:latest
+          image: prom/prometheus:v2.52.0
+          args:
+            - "--config.file=/etc/prometheus/prometheus.yml"
+            - "--storage.tsdb.path=/prometheus"
           ports:
             - containerPort: 9090
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              memory: "1024Mi"
           volumeMounts:
-            - name: prometheus-config
-              mountPath: /etc/prometheus/prometheus.yml
-              subPath: prometheus.yml
+            - name: config
+              mountPath: /etc/prometheus
+            - name: storage
+              mountPath: /prometheus
       volumes:
-        - name: prometheus-config
+        - name: config
           configMap:
             name: prometheus-config
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: prometheus
-  namespace: h3llra1s3r
-spec:
-  type: LoadBalancer
-  ports:
-    - port: 9090
-  selector:
-    app: prometheus
+        - name: storage
+          emptyDir: {}
