@@ -7,49 +7,49 @@ using static H3lRa1s3r.Api.OrderService.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Logging
+// ---- Logging ----
 builder.Host.UseSerilog((ctx, cfg) =>
-    cfg.ReadFrom.Configuration(ctx.Configuration).WriteTo.Console());
+    cfg.ReadFrom.Configuration(ctx.Configuration)
+       .WriteTo.Console());
 
-// --- Build secure connection string from ENV variables ---
-var host = Environment.GetEnvironmentVariable("POSTGRES_HOST")
-           ?? "postgres.h3llra1s3r.svc.cluster.local";
+// ---- Services ----
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
-var dbname = Environment.GetEnvironmentVariable("POSTGRES_DB") ?? "h3db";
+// ---- PostgreSQL + EF Core ----
 var user = Environment.GetEnvironmentVariable("POSTGRES_USER");
 var pass = Environment.GetEnvironmentVariable("POSTGRES_PASSWORD");
 
-var conn = $"Host={host};Port=5432;Database={dbname};Username={user};Password={pass};Pooling=true;";
+var conn = $"Host=postgres.h3llra1s3r.svc.cluster.local;Port=5432;Database=h3db;Username={user};Password={pass};Pooling=true;";
 
-// EF Core
 builder.Services.AddDbContext<OrderDbContext>(o => o.UseNpgsql(conn));
-builder.Services.AddHealthChecks();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
     p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
 
+builder.Services.AddHealthChecks();
+
 var app = builder.Build();
 
-// DB Migrations with Retry
+// ---- Ensure DB schema + run migrations ----
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<OrderDbContext>();
 
     var retryPolicy = Policy
         .Handle<Exception>()
-        .WaitAndRetry(5, _ => TimeSpan.FromSeconds(3),
-            (ex, _) => Console.WriteLine($"⏳ Waiting for DB... ({ex.Message})"));
+        .WaitAndRetry(5, attempt => TimeSpan.FromSeconds(3),
+            (ex, time) => Console.WriteLine($"⏳ Waiting for DB... ({ex.Message})"));
 
     retryPolicy.Execute(() =>
     {
-        Console.WriteLine("🔍 Applying EF Core migrations...");
+        Console.WriteLine("🔍 Applying pending EF Core migrations...");
         db.Database.Migrate();
-        Console.WriteLine("✅ Database ready!");
+        Console.WriteLine("✅ Database schema up to date!");
     });
 }
 
-// Middleware
+// ---- Middleware ----
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -63,9 +63,9 @@ app.UseCors();
 app.UseMetricServer();
 app.UseHttpMetrics();
 
-// API
-app.MapGet("/api/v1/orders", async (OrderDbContext dbCtx) =>
-    Results.Ok(await dbCtx.Orders.ToListAsync()));
+// ---- Endpoints ----
+app.MapGet("/api/v1/orders", async (OrderDbContext db) =>
+    Results.Ok(await db.Orders.ToListAsync()));
 
 app.MapGet("/healthz/live", () => Results.Ok("Alive"));
 app.MapGet("/healthz/ready", () => Results.Ok("Ready"));

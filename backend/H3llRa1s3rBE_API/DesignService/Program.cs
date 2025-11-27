@@ -6,32 +6,29 @@ using static H3lRa1s3r.Api.DesignService.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Logging
+// ---- Logging ----
 builder.Host.UseSerilog((ctx, cfg) =>
     cfg.ReadFrom.Configuration(ctx.Configuration).WriteTo.Console());
 
-// --- Build secure connection string from ENV vars ---
-var host = Environment.GetEnvironmentVariable("POSTGRES_HOST")
-           ?? "postgres.h3llra1s3r.svc.cluster.local";
+// ---- Services ----
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
-var db = Environment.GetEnvironmentVariable("POSTGRES_DB") ?? "h3db";
+// ---- PostgreSQL + EF Core ----
 var user = Environment.GetEnvironmentVariable("POSTGRES_USER");
 var pass = Environment.GetEnvironmentVariable("POSTGRES_PASSWORD");
 
-var conn = $"Host={host};Port=5432;Database={db};Username={user};Password={pass};Pooling=true;";
+var conn = $"Host=postgres.h3llra1s3r.svc.cluster.local;Port=5432;Database=h3db;Username={user};Password={pass}";
 
-// EF Core
 builder.Services.AddDbContext<DesignDbContext>(o => o.UseNpgsql(conn));
 builder.Services.AddHealthChecks().AddNpgSql(conn);
 
-// Misc services
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
     p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
 
 var app = builder.Build();
 
+// ---- Middleware ----
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -45,24 +42,33 @@ app.UseCors();
 app.UseMetricServer();
 app.UseHttpMetrics();
 
-// API Endpoints
-app.MapPost("/api/v1/designs", async (Design d, DesignDbContext dbCtx) =>
+// ---- Endpoints ----
+app.MapPost("/api/v1/designs", async (Design d, DesignDbContext db) =>
 {
-    d.Id ??= Guid.NewGuid().ToString("n");
-    d.CreatedAt = DateTimeOffset.UtcNow;
-    dbCtx.Designs.Add(d);
-    await dbCtx.SaveChangesAsync();
-    return Results.Created($"/api/v1/designs/{d.Id}", d);
-});
+    var id = string.IsNullOrWhiteSpace(d.Id) ? Guid.NewGuid().ToString("n") : d.Id;
+    var newDesign = new Design
+    {
+        Id = id,
+        UserId = d.UserId,
+        Name = d.Name,
+        JsonPayload = d.JsonPayload,
+        CreatedAt = DateTimeOffset.UtcNow
+    };
 
-app.MapGet("/api/v1/designs/{id}", async (string id, DesignDbContext dbCtx) =>
+    db.Designs.Add(newDesign);
+    await db.SaveChangesAsync();
+
+    return Results.Created($"/api/v1/designs/{id}", newDesign);
+}).WithOpenApi();
+
+app.MapGet("/api/v1/designs/{id}", async (string id, DesignDbContext db) =>
 {
-    var design = await dbCtx.Designs.FindAsync(id);
+    var design = await db.Designs.FindAsync(id);
     return design is not null ? Results.Ok(design) : Results.NotFound();
 });
 
-app.MapGet("/api/v1/designs", async (DesignDbContext dbCtx) =>
-    Results.Ok(await dbCtx.Designs.ToListAsync()));
+app.MapGet("/api/v1/designs", async (DesignDbContext db) =>
+    Results.Ok(await db.Designs.ToListAsync()));
 
 app.MapHealthChecks("/healthz/live");
 app.MapHealthChecks("/healthz/ready");
