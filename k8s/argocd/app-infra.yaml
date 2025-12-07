@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'https://github.com/YOUR_USERNAME/Project--H3lra1s3r.git'
+    repoURL: 'repoURL: https://github.com/mishoka11/Project--H3lra1s3r'
     targetRevision: main
     path: k8s/infra
   destination:
