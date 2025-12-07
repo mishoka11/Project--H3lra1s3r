@@ -13,15 +13,20 @@ spec:
       labels:
         app: design-service
     spec:
+      serviceAccountName: design-sa
+      automountServiceAccountToken: true
+
       containers:
         - name: design-service
           image: mmihov11/design-service:1.1
           ports:
             - containerPort: 8080
+
           env:
             - name: ASPNETCORE_ENVIRONMENT
               value: "Production"
 
+            # DB credentials
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
@@ -33,6 +38,14 @@ spec:
                 secretKeyRef:
                   name: h3llra1s3r-secrets
                   key: POSTGRES_PASSWORD
+
+            # DESIGN DB connection
+            - name: ConnectionStrings__Design
+              valueFrom:
+                secretKeyRef:
+                  name: h3llra1s3r-secrets
+                  key: DESIGN_CONNECTION
+
 ---
 apiVersion: v1
 kind: Service

@@ -17,11 +17,5 @@
             public ICollection<OrderItem> Items { get; set; } = new List<OrderItem>();
             public string Status { get; set; } = "Created";
         }
-
-        // Keeping the old dictionary for compatibility (not used by EF)
-        public static class OrdersDb
-        {
-            public static readonly Dictionary<string, Order> Orders = new();
-        }
     }
 }

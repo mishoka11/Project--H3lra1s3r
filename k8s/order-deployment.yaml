@@ -12,16 +12,23 @@ spec:
     metadata:
       labels:
         app: order-service
+      annotations:
+        iam.gke.io/gcp-service-account: order-pubsub-sa@linear-pointer-479410-n7.iam.gserviceaccount.com
     spec:
+      serviceAccountName: order-sa
+      automountServiceAccountToken: true
+
       containers:
         - name: order-service
-          image: mmihov11/order-service:1.4
+          image: mmihov11/order-service:2.0
           ports:
             - containerPort: 8080
+
           env:
             - name: ASPNETCORE_ENVIRONMENT
               value: "Production"
 
+            # Database credentials
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
@@ -33,6 +40,14 @@ spec:
                 secretKeyRef:
                   name: h3llra1s3r-secrets
                   key: POSTGRES_PASSWORD
+
+            # ORDER DB connection
+            - name: ConnectionStrings__Orders
+              valueFrom:
+                secretKeyRef:
+                  name: h3llra1s3r-secrets
+                  key: ORDER_CONNECTION
+
 ---
 apiVersion: v1
 kind: Service

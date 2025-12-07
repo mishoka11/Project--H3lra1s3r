@@ -13,37 +13,60 @@ spec:
       labels:
         app: catalog-service
     spec:
+      serviceAccountName: catalog-sa
+      automountServiceAccountToken: true
+
       containers:
         - name: catalog-service
-          image: mmihov11/catalog-service:1.0
+          image: mmihov11/catalog-service:1.2
           ports:
             - containerPort: 8080
+
           env:
             - name: ASPNETCORE_ENVIRONMENT
               value: "Production"
+
+            # DB credentials
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: h3llra1s3r-secrets
+                  key: POSTGRES_USER
+
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: h3llra1s3r-secrets
+                  key: POSTGRES_PASSWORD
+
+            # CATALOG DB connection
             - name: ConnectionStrings__Catalog
               valueFrom:
                 secretKeyRef:
                   name: h3llra1s3r-secrets
                   key: CATALOG_CONNECTION
+
           livenessProbe:
             httpGet:
               path: /healthz/live
               port: 8080
             initialDelaySeconds: 15
             periodSeconds: 20
+
           readinessProbe:
             httpGet:
               path: /healthz/ready
               port: 8080
             initialDelaySeconds: 10
             periodSeconds: 10
+
           resources:
             requests:
               cpu: "250m"
               memory: "256Mi"
             limits:
               memory: "512Mi"
+
 ---
 apiVersion: v1
 kind: Service
