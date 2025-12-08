@@ -6,13 +6,12 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'repoURL: https://github.com/mishoka11/Project--H3lra1s3r'
+    repoURL: "https://github.com/mishoka11/Project--H3lra1s3r"
     targetRevision: main
     path: k8s/design
   destination:
-    server: https://kubernetes.default.svc
+    server: "https://kubernetes.default.svc"
     namespace: h3llra1s3r
-
   syncPolicy:
     automated:
       prune: true
