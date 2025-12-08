@@ -11,6 +11,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using System.Linq;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -54,7 +55,8 @@ builder.Services.AddAuthorization();
 var user = Environment.GetEnvironmentVariable("POSTGRES_USER");
 var pass = Environment.GetEnvironmentVariable("POSTGRES_PASSWORD");
 
-var conn = $"Host=postgres-catalog.h3llra1s3r.svc.cluster.local;Port=5432;Database=catalogdb;Username={user};Password={pass};Pooling=true;";
+var conn =
+    $"Host=postgres-catalog.h3llra1s3r.svc.cluster.local;Port=5432;Database=catalogdb;Username={user};Password={pass};Pooling=true;";
 
 builder.Services.AddDbContext<CatalogDbContext>(o => o.UseNpgsql(conn));
 builder.Services.AddHealthChecks().AddNpgSql(conn);
@@ -68,18 +70,45 @@ builder.Services.AddResponseCaching();
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
     p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
 
-builder.Services.AddHostedService<PubSubBackgroundService>();
+// ---- PubSub background worker is now OPTIONAL ----
+var enablePubSub = builder.Configuration.GetValue<bool>("PubSub:Enabled", false);
+if (enablePubSub)
+{
+    builder.Services.AddHostedService<PubSubBackgroundService>();
+}
 
 var app = builder.Build();
 
 // ------------------------------------------------------
-// Migrate + Seed
+// Ensure DB + Seed (safe, non-fatal)
 // ------------------------------------------------------
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
-    db.Database.Migrate();
-    Seed.AddDemoProducts(db);
+    var loggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
+    var startupLogger = loggerFactory.CreateLogger("CatalogStartup");
+
+    try
+    {
+        // Create schema if it doesn't exist
+        db.Database.EnsureCreated();
+
+        // Seed only when empty
+        if (!db.Products.Any())
+        {
+            Seed.AddDemoProducts(db);
+            startupLogger.LogInformation("Catalog database ensured and seeded with demo products.");
+        }
+        else
+        {
+            startupLogger.LogInformation("Catalog database already contains products; skipping seeding.");
+        }
+    }
+    catch (Exception ex)
+    {
+        // Log but DO NOT crash the host
+        startupLogger.LogError(ex, "Error while initializing/seeding the catalog database.");
+    }
 }
 
 // ------------------------------------------------------
@@ -98,7 +127,7 @@ app.UseHttpMetrics();
 // Protected endpoints
 // ------------------------------------------------------
 app.MapGet("/api/v1/catalog", async (CatalogDbContext db) =>
-    Results.Ok(await db.Products.ToListAsync()))
+        Results.Ok(await db.Products.ToListAsync()))
     .RequireAuthorization();
 
 app.MapGet("/api/v1/catalog/{id}", async (string id, CatalogDbContext db) =>
@@ -106,7 +135,7 @@ app.MapGet("/api/v1/catalog/{id}", async (string id, CatalogDbContext db) =>
     var p = await db.Products.FindAsync(id);
     return p is not null ? Results.Ok(p) : Results.NotFound();
 })
-.RequireAuthorization();
+    .RequireAuthorization();
 
 // ------------------------------------------------------
 // Health endpoints (public)
@@ -133,18 +162,30 @@ public class PubSubBackgroundService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var sub = SubscriptionName.Parse(_subscription);
-        var client = await SubscriberClient.CreateAsync(sub);
-
-        await client.StartAsync(async (msg, _) =>
+        try
         {
-            var json = msg.Data.ToStringUtf8();
-            var dto = JsonSerializer.Deserialize<OrderCreatedDto>(json);
+            var sub = SubscriptionName.Parse(_subscription);
+            var client = await SubscriberClient.CreateAsync(sub);
 
-            _logger.LogInformation("Catalog received OrderCreated: {OrderId}", dto?.OrderId);
+            await client.StartAsync(async (msg, _) =>
+            {
+                var json = msg.Data.ToStringUtf8();
+                var dto = JsonSerializer.Deserialize<OrderCreatedDto>(json);
 
-            return SubscriberClient.Reply.Ack;
-        });
+                _logger.LogInformation(
+                    "Catalog received OrderCreated: {OrderId}",
+                    dto?.OrderId
+                );
+
+                return SubscriberClient.Reply.Ack;
+            });
+        }
+        catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
+        {
+            // In environments without Pub/Sub permissions (like your GKE cluster),
+            // we log the error but DO NOT crash the host.
+            _logger.LogError(ex, "PubSub listener failed; continuing without PubSub.");
+        }
     }
 }
 

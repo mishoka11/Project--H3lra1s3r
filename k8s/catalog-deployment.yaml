@@ -15,12 +15,13 @@ spec:
     spec:
       serviceAccountName: catalog-sa
       automountServiceAccountToken: true
-
       containers:
         - name: catalog-service
           image: mmihov11/catalog-service:1.2
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
+              protocol: TCP
 
           env:
             - name: ASPNETCORE_ENVIRONMENT
@@ -48,17 +49,25 @@ spec:
 
           livenessProbe:
             httpGet:
-              path: /healthz/live
+              path: /health/live
               port: 8080
+              scheme: HTTP
             initialDelaySeconds: 15
             periodSeconds: 20
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 3
 
           readinessProbe:
             httpGet:
-              path: /healthz/ready
+              path: /health/ready
               port: 8080
+              scheme: HTTP
             initialDelaySeconds: 10
             periodSeconds: 10
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 3
 
           resources:
             requests:
