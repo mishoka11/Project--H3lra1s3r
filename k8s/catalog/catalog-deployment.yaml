@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog-service
+  namespace: h3llra1s3r
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: catalog-service
+  template:
+    metadata:
+      labels:
+        app: catalog-service
+    spec:
+      containers:
+        - name: catalog-service
+          image: mmihov11/catalog-service:1.3
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_URLS
+              value: "http://+:8080"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: h3llra1s3r-secrets
+                  key: postgres-user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: h3llra1s3r-secrets
+                  key: postgres-password
+            - name: Jwt__Key
+              valueFrom:
+                secretKeyRef:
+                  name: h3llra1s3r-secrets
+                  key: jwt-key
+            - name: PubSub__Enabled
+              value: "false"
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz/live
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
