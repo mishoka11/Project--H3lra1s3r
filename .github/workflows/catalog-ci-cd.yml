@@ -5,10 +5,8 @@ on:
     branches: ["main", "feature/*"]
     paths:
       - "backend/H3llRa1s3rBE_API/CatalogService/**"
-      - ".github/workflows/catalog-ci-cd.yml"
-    paths-ignore:
-      - "k8s/**"      # avoid loop when only manifests are committed
-  workflow_dispatch: {} # manual trigger
+      - "k8s/catalog/**"
+  workflow_dispatch:
 
 env:
   REGISTRY: docker.io/mmihov11
@@ -22,7 +20,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set image tag
+      - name: Set image tag (short SHA)
         id: vars
         run: echo "TAG=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
@@ -50,8 +48,8 @@ jobs:
           echo "Resulting image line:"
           grep -n "image:" "$FILE" || true
 
-      - name: Commit & push manifest changes (main only)
-        if: github.ref == 'refs/heads/main'
+      - name: Commit & push manifest changes (main only, avoid loops)
+        if: github.ref == 'refs/heads/main' && github.actor != 'github-actions[bot]'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
