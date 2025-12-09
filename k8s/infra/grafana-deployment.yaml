@@ -32,7 +32,7 @@ spec:
             - name: GF_AUTH_ANONYMOUS_ENABLED
               value: "false"
           volumeMounts:
-            - name: grafana-datasources
+            - name: grafana-config
               mountPath: /etc/grafana/provisioning/datasources
           resources:
             requests:
@@ -41,9 +41,9 @@ spec:
             limits:
               memory: "512Mi"
       volumes:
-        - name: grafana-datasources
+        - name: grafana-config
           configMap:
-            name: grafana-datasources
+            name: grafana-config
 ---
 apiVersion: v1
 kind: Service
