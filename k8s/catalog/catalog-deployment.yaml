@@ -31,14 +31,14 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: h3llra1s3r-secrets
-                  key: postgres-password
+                  key: POSTGRES_PASSWORD
             - name: Jwt__Key
               valueFrom:
                 secretKeyRef:
                   name: h3llra1s3r-secrets
                   key: jwt-key
             - name: PubSub__Enabled
-              value: "false"
+              value: "true"
           readinessProbe:
             httpGet:
               path: /healthz/ready
