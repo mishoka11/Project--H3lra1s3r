@@ -1,0 +1,125 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog-service
+  namespace: h3llra1s3r
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: catalog-service
+  template:
+    metadata:
+      labels:
+        app: catalog-service
+      annotations:
+        iam.gke.io/gcp-service-account: catalog-pubsub-sa@linear-pointer-479410-n7.iam.gserviceaccount.com
+    spec:
+      serviceAccountName: catalog-sa
+      automountServiceAccountToken: true
+      containers:
+        - name: catalog-service
+          image: mmihov11/catalog-service:1.2
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: "Production"
+
+            # -----------------------------
+            # Database credentials
+            # -----------------------------
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: h3llra1s3r-secrets
+                  key: POSTGRES_USER
+
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: h3llra1s3r-secrets
+                  key: POSTGRES_PASSWORD
+
+            # CATALOG DB connection (keeping it)
+            - name: ConnectionStrings__Catalog
+              valueFrom:
+                secretKeyRef:
+                  name: h3llra1s3r-secrets
+                  key: CATALOG_CONNECTION
+
+            # -----------------------------
+            # JWT signing key
+            # -----------------------------
+            - name: Jwt__Key
+              valueFrom:
+                secretKeyRef:
+                  name: h3llra1s3r-secrets
+                  key: jwt-key
+
+            # -----------------------------
+            # Pub/Sub enable flag
+            # -----------------------------
+            - name: PubSub__Enabled
+              value: "true"
+
+            # -----------------------------
+            # GCP Pub/Sub (SAGA)
+            # -----------------------------
+            - name: Gcp__ProjectId
+              value: "linear-pointer-479410-n7"
+
+            # Catalog listens to order.created using this subscription
+            - name: Gcp__CatalogOrdersSubscription
+              value: "catalog-orders-sub"
+
+            # Catalog publishes stock outcomes here
+            - name: Gcp__StockTopic
+              value: "stock-events"
+
+          # IMPORTANT: match your code's health endpoints
+          livenessProbe:
+            httpGet:
+              path: /healthz/live
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 3
+
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              memory: "512Mi"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog-service
+  namespace: h3llra1s3r
+spec:
+  type: ClusterIP
+  selector:
+    app: catalog-service
+  ports:
+    - port: 8080
+      targetPort: 8080

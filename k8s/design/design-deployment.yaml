@@ -15,12 +15,13 @@ spec:
     spec:
       serviceAccountName: design-sa
       automountServiceAccountToken: true
-
       containers:
         - name: design-service
           image: mmihov11/design-service:1.1
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
+              protocol: TCP
 
           env:
             - name: ASPNETCORE_ENVIRONMENT
@@ -45,6 +46,35 @@ spec:
                 secretKeyRef:
                   name: h3llra1s3r-secrets
                   key: DESIGN_CONNECTION
+
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 3
+
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              memory: "512Mi"
 
 ---
 apiVersion: v1

@@ -17,7 +17,6 @@ spec:
     spec:
       serviceAccountName: order-sa
       automountServiceAccountToken: true
-
       containers:
         - name: order-service
           image: mmihov11/order-service:2.0
@@ -28,7 +27,9 @@ spec:
             - name: ASPNETCORE_ENVIRONMENT
               value: "Production"
 
+            # -----------------------------
             # Database credentials
+            # -----------------------------
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
@@ -41,12 +42,33 @@ spec:
                   name: h3llra1s3r-secrets
                   key: POSTGRES_PASSWORD
 
-            # ORDER DB connection
+            # ORDER DB connection (currently not used by your code, but keeping it)
             - name: ConnectionStrings__Orders
               valueFrom:
                 secretKeyRef:
                   name: h3llra1s3r-secrets
                   key: ORDER_CONNECTION
+
+            # -----------------------------
+            # JWT signing key
+            # -----------------------------
+            - name: Jwt__Key
+              valueFrom:
+                secretKeyRef:
+                  name: h3llra1s3r-secrets
+                  key: jwt-key
+
+            # -----------------------------
+            # GCP Pub/Sub (SAGA)
+            # -----------------------------
+            - name: Gcp__ProjectId
+              value: "linear-pointer-479410-n7"
+
+            - name: Gcp__OrderTopic
+              value: "orders-topic"
+
+            - name: Gcp__StockSubscription
+              value: "stock-events-sub"
 
 ---
 apiVersion: v1
